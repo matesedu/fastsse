@@ -1,0 +1,33 @@
+{
+  "name": "fastsse-workspace",
+  "private": true,
+  "keywords": [
+    "napi-rs",
+    "rust",
+    "server-sent-events",
+    "sse",
+    "wasm"
+  ],
+  "license": "GPL-3.0-or-later",
+  "author": "Mates Inc.",
+  "scripts": {
+    "build": "cargo build --workspace",
+    "build:node": "pnpm --dir npm/fastsse_node run build",
+    "build:wasm": "wasm-pack build crates/fastsse_wasm --target web --out-dir ../../npm/fastsse_wasm --out-name fastsse",
+    "fmt": "oxfmt .",
+    "check": "cargo check -p fastsse -p fastsse-node --all-targets && cargo check -p fastsse-wasm --target wasm32-unknown-unknown",
+    "lint": "cargo clippy -p fastsse -p fastsse-node --all-targets -- -D warnings && cargo clippy -p fastsse-wasm --target wasm32-unknown-unknown -- -D warnings",
+    "test": "cargo test -p fastsse && cargo test -p fastsse-node",
+    "bench": "cargo bench -p fastsse",
+    "release:patch": "node scripts/release.mjs patch",
+    "release:minor": "node scripts/release.mjs minor",
+    "release:alpha": "node scripts/release.mjs alpha",
+    "release:beta": "node scripts/release.mjs beta"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "3.5.1",
+    "oxfmt": "^0.36.0",
+    "vite-plus": "0.1.14"
+  },
+  "packageManager": "pnpm@10.32.1"
+}

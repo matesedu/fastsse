@@ -1,0 +1,19 @@
+[package]
+name = "fastsse-wasm"
+description = "Browser bindings for fastsse built with wasm-bindgen."
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+fastsse = { path = "../fastsse" }
+js-sys.workspace = true
+wasm-bindgen.workspace = true
+
+[lints]
+workspace = true

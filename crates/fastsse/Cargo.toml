@@ -1,0 +1,23 @@
+[package]
+name = "fastsse"
+description = "Low-allocation Server-Sent Events encoder and incremental decoder."
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+compact_str.workspace = true
+memchr.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+insta.workspace = true
+
+[[bench]]
+harness = false
+name = "codec"
+
+[lints]
+workspace = true

@@ -1,0 +1,23 @@
+[package]
+name = "fastsse-node"
+description = "Node.js bindings for fastsse built with napi-rs."
+build = "build.rs"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+fastsse = { path = "../fastsse" }
+napi.workspace = true
+napi-derive.workspace = true
+
+[build-dependencies]
+napi-build.workspace = true
+
+[lints]
+workspace = true

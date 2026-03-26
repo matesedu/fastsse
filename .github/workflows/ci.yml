@@ -1,0 +1,15 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@v19
+      - run: nix develop --command sh -lc "vp install && vp run fmt -- --check && vp run lint && vp run check && vp run test && vp run build:node && vp run build:wasm"

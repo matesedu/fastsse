@@ -1,0 +1,9 @@
+---
+source: crates/fastsse/tests/codec.rs
+expression: "String::from_utf8(payload).expect(\"utf8\")"
+---
+retry:1500
+id:evt-1
+event:chat
+data:hello
+data:world

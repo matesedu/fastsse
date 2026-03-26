@@ -1,0 +1,7 @@
+---
+source: crates/fastsse/tests/codec.rs
+expression: "String::from_utf8(combined).expect(\"utf8\")"
+---
+:keepalive
+
+retry:2000

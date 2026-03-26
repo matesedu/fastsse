@@ -1,0 +1,27 @@
+{
+  "name": "@matesinc/fastsse-node",
+  "version": "0.1.0",
+  "private": true,
+  "keywords": [
+    "napi-rs",
+    "rust",
+    "server-sent-events",
+    "sse"
+  ],
+  "license": "GPL-3.0-or-later",
+  "author": "Mates Inc.",
+  "files": [
+    "fastsse.node",
+    "index.d.ts",
+    "index.js"
+  ],
+  "type": "commonjs",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "scripts": {
+    "build": "napi build --manifest-path ../../crates/fastsse_node/Cargo.toml --package-json-path package.json --output-dir ."
+  },
+  "napi": {
+    "binaryName": "fastsse"
+  }
+}
