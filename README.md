@@ -35,6 +35,9 @@ vp run test
 
 ## Release
 
+See [RELEASE.md](RELEASE.md) for the full release checklist and versioning
+contract.
+
 ```bash
 vp run release:patch
 vp run release:minor
