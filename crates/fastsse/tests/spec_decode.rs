@@ -222,6 +222,58 @@ fn finish_discards_incomplete_event_and_prepares_for_next_stream() -> Result<(),
 }
 
 #[test]
+fn finish_discards_uncommitted_id_from_incomplete_event() -> Result<(), DecodeError> {
+  let mut decoder = Decoder::new();
+  let mut items = Vec::new();
+
+  decoder.feed_collect(b"id: stable\ndata: first\n\n", &mut items)?;
+  decoder.feed_collect(b"id: stale\ndata: lost\n", &mut items)?;
+  decoder.finish();
+  decoder.feed_collect(b"data: next\n\n", &mut items)?;
+
+  assert_eq!(
+    items,
+    vec![
+      OwnedItem::Event(OwnedEvent {
+        event: "message".into(),
+        data: "first".into(),
+        id: "stable".into(),
+      }),
+      OwnedItem::Event(OwnedEvent {
+        event: "message".into(),
+        data: "next".into(),
+        id: "stable".into(),
+      }),
+    ]
+  );
+  assert_eq!(decoder.last_event_id(), "stable");
+
+  Ok(())
+}
+
+#[test]
+fn id_only_block_commits_last_event_id() -> Result<(), DecodeError> {
+  let mut decoder = Decoder::new();
+  let mut items = Vec::new();
+
+  decoder.feed_collect(b"id: committed\n\n", &mut items)?;
+  assert!(items.is_empty());
+  assert_eq!(decoder.last_event_id(), "committed");
+
+  decoder.feed_collect(b"data: next\n\n", &mut items)?;
+  assert_eq!(
+    items,
+    vec![OwnedItem::Event(OwnedEvent {
+      event: "message".into(),
+      data: "next".into(),
+      id: "committed".into(),
+    })]
+  );
+
+  Ok(())
+}
+
+#[test]
 fn strips_only_the_first_leading_bom() {
   assert_eq!(
     decode_ok(b"\xEF\xBB\xBFdata: \xEF\xBB\xBFx\n\n"),

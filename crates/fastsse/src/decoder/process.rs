@@ -31,24 +31,18 @@ impl Decoder {
       let line = &chunk[..line_end];
 
       if self.line.is_empty() {
-        process_line(
-          line,
-          &mut self.data,
-          &mut self.event,
-          &mut self.last_event_id,
-          &mut self.retry,
-          emit,
-        )?;
+        process_line(line, &mut self.process_state(), emit)?;
       } else {
         self.line.extend_from_slice(line);
-        process_line(
-          self.line.as_slice(),
-          &mut self.data,
-          &mut self.event,
-          &mut self.last_event_id,
-          &mut self.retry,
-          emit,
-        )?;
+        let mut state = ProcessState {
+          data: &mut self.data,
+          event: &mut self.event,
+          last_event_id: &mut self.last_event_id,
+          pending_last_event_id: &mut self.pending_last_event_id,
+          has_pending_last_event_id: &mut self.has_pending_last_event_id,
+          retry: &mut self.retry,
+        };
+        process_line(self.line.as_slice(), &mut state, emit)?;
         self.line.clear();
       }
 
@@ -66,21 +60,34 @@ impl Decoder {
 
     Ok(())
   }
+
+  fn process_state(&mut self) -> ProcessState<'_> {
+    ProcessState {
+      data: &mut self.data,
+      event: &mut self.event,
+      last_event_id: &mut self.last_event_id,
+      pending_last_event_id: &mut self.pending_last_event_id,
+      has_pending_last_event_id: &mut self.has_pending_last_event_id,
+      retry: &mut self.retry,
+    }
+  }
 }
 
-fn process_line<F>(
-  line: &[u8],
-  data: &mut Vec<u8>,
-  event: &mut String,
-  last_event_id: &mut String,
-  retry: &mut Option<u64>,
-  emit: &mut F,
-) -> Result<(), DecodeError>
+struct ProcessState<'a> {
+  data: &'a mut Vec<u8>,
+  event: &'a mut String,
+  last_event_id: &'a mut String,
+  pending_last_event_id: &'a mut String,
+  has_pending_last_event_id: &'a mut bool,
+  retry: &'a mut Option<u64>,
+}
+
+fn process_line<F>(line: &[u8], state: &mut ProcessState<'_>, emit: &mut F) -> Result<(), DecodeError>
 where
   F: for<'event> FnMut(Item<'event>),
 {
   if line.is_empty() {
-    return dispatch_event(data, event, last_event_id.as_str(), emit);
+    return dispatch_event(state, emit);
   }
   if line[0] == b':' {
     return Ok(());
@@ -89,24 +96,25 @@ where
   let (field, value) = split_field(line);
 
   if field == b"data" {
-    data.extend_from_slice(value);
-    data.push(b'\n');
+    state.data.extend_from_slice(value);
+    state.data.push(b'\n');
     return Ok(());
   }
   if field == b"event" {
-    event.clear();
-    event.push_str(decode_utf8(value).as_ref());
+    state.event.clear();
+    state.event.push_str(decode_utf8(value).as_ref());
     return Ok(());
   }
   if field == b"id" {
     if !contains_nul(value) {
-      last_event_id.clear();
-      last_event_id.push_str(decode_utf8(value).as_ref());
+      state.pending_last_event_id.clear();
+      state.pending_last_event_id.push_str(decode_utf8(value).as_ref());
+      *state.has_pending_last_event_id = true;
     }
     return Ok(());
   }
   if field == b"retry" && let Some(parsed) = parse_retry(value) {
-    *retry = Some(parsed);
+    *state.retry = Some(parsed);
     emit(Item::Retry(parsed));
   }
 
@@ -114,42 +122,49 @@ where
 }
 
 fn dispatch_event<F>(
-  data_buffer: &mut Vec<u8>,
-  event_buffer: &mut String,
-  last_event_id: &str,
+  state: &mut ProcessState<'_>,
   emit: &mut F,
 ) -> Result<(), DecodeError>
 where
   F: for<'event> FnMut(Item<'event>),
 {
-  if data_buffer.is_empty() {
-    event_buffer.clear();
+  if *state.has_pending_last_event_id {
+    state.last_event_id.clear();
+    state
+      .last_event_id
+      .push_str(state.pending_last_event_id.as_str());
+    state.pending_last_event_id.clear();
+    *state.has_pending_last_event_id = false;
+  }
+
+  if state.data.is_empty() {
+    state.event.clear();
     return Ok(());
   }
 
-  let data_len = data_buffer.len() - 1;
+  let data_len = state.data.len() - 1;
   let data_storage;
-  let data = match decode_utf8(&data_buffer[..data_len]) {
+  let data = match decode_utf8(&state.data[..data_len]) {
     Cow::Borrowed(data) => data,
     Cow::Owned(owned) => {
       data_storage = owned;
       data_storage.as_str()
     }
   };
-  let event_name = if event_buffer.is_empty() {
+  let event_name = if state.event.is_empty() {
     "message"
   } else {
-    event_buffer.as_str()
+    state.event.as_str()
   };
 
   emit(Item::Event(Event {
     event: event_name,
     data,
-    id: last_event_id,
+    id: state.last_event_id.as_str(),
   }));
 
-  data_buffer.clear();
-  event_buffer.clear();
+  state.data.clear();
+  state.event.clear();
   Ok(())
 }
 
