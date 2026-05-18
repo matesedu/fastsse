@@ -29,6 +29,9 @@ pub struct EncodeEvent<'a> {
   /// Optional event type. Omit to use the default `"message"` dispatch type.
   pub event: Option<&'a str>,
   /// Required event payload.
+  ///
+  /// The encoder writes one `data:` field per logical line. `\r\n`, bare `\r`,
+  /// and bare `\n` are all normalized to LF-separated SSE data lines on the wire.
   pub data: &'a str,
   /// Optional event identifier. Use `Some("")` to reset the id.
   pub id: Option<&'a str>,

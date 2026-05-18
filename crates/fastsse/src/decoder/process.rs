@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use memchr::{memchr, memchr2};
 
-use crate::decoder::{Decoder, contains_nul};
+use crate::decoder::{Decoder, DecoderLimits, contains_nul};
 use crate::error::DecodeError;
 use crate::event::{Event, Item};
 
@@ -27,6 +27,9 @@ impl Decoder {
 
     while !chunk.is_empty() {
       let Some(line_end) = memchr2(b'\n', b'\r', chunk) else {
+        self
+          .limits
+          .check_line_growth(self.line.len(), chunk.len())?;
         self.line.extend_from_slice(chunk);
         return Ok(());
       };
@@ -35,8 +38,10 @@ impl Decoder {
       let line = &chunk[..line_end];
 
       if self.line.is_empty() {
+        self.limits.check_line_len(line.len())?;
         process_line(line, &mut self.process_state(), emit)?;
       } else {
+        self.limits.check_line_growth(self.line.len(), line.len())?;
         self.line.extend_from_slice(line);
         let mut state = ProcessState {
           data: &mut self.data,
@@ -45,6 +50,7 @@ impl Decoder {
           pending_last_event_id: &mut self.pending_last_event_id,
           has_pending_last_event_id: &mut self.has_pending_last_event_id,
           retry: &mut self.retry,
+          limits: self.limits,
         };
         process_line(self.line.as_slice(), &mut state, emit)?;
         self.line.clear();
@@ -73,6 +79,7 @@ impl Decoder {
       pending_last_event_id: &mut self.pending_last_event_id,
       has_pending_last_event_id: &mut self.has_pending_last_event_id,
       retry: &mut self.retry,
+      limits: self.limits,
     }
   }
 }
@@ -84,6 +91,7 @@ struct ProcessState<'a> {
   pending_last_event_id: &'a mut String,
   has_pending_last_event_id: &'a mut bool,
   retry: &'a mut Option<u64>,
+  limits: DecoderLimits,
 }
 
 fn process_line<F>(
@@ -104,6 +112,13 @@ where
   let (field, value) = split_field(line);
 
   if field == b"data" {
+    let additional = value
+      .len()
+      .checked_add(1)
+      .ok_or(DecodeError::new("data", "configured byte limit exceeded"))?;
+    state
+      .limits
+      .check_event_growth(state.data.len(), additional)?;
     state.data.extend_from_slice(value);
     state.data.push(b'\n');
     return Ok(());
