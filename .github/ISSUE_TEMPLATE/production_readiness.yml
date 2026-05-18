@@ -1,0 +1,36 @@
+name: Production-readiness task
+description: Track hardening work required before a production release.
+title: "chore: "
+labels:
+  - production-readiness
+body:
+  - type: textarea
+    id: risk
+    attributes:
+      label: Risk
+      description: What production or release risk does this remove?
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: What code, docs, CI, package, or release surface is affected?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      placeholder: |
+        - ...
+        - ...
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Required validation
+      description: Which commands or checks should pass before this can merge?
+    validations:
+      required: true

@@ -1,0 +1,18 @@
+# Repository-wide defaults.
+* @mates-dev/backend
+
+# Release and package metadata.
+/Cargo.toml @mates-dev/backend
+/package.json @mates-dev/backend
+/pnpm-lock.yaml @mates-dev/backend
+/scripts/release.mjs @mates-dev/backend @mates-dev/chief
+/npm/ @mates-dev/backend @mates-dev/frontend
+
+# CI and development environment.
+/.github/ @mates-dev/backend @mates-dev/chief
+/flake.nix @mates-dev/backend
+
+# Core codec and bindings.
+/crates/fastsse/ @mates-dev/backend
+/crates/fastsse_node/ @mates-dev/backend
+/crates/fastsse_wasm/ @mates-dev/backend @mates-dev/frontend

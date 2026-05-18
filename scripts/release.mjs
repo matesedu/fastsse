@@ -1,8 +1,15 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
 const ROOT_CARGO_TOML = new URL("../Cargo.toml", import.meta.url);
+const ROOT_CARGO_LOCK = new URL("../Cargo.lock", import.meta.url);
 const NODE_PACKAGE_JSON = new URL("../npm/fastsse_node/package.json", import.meta.url);
+const WASM_PACKAGE_JSON = new URL("../npm/fastsse_wasm/package.json", import.meta.url);
+const PACKAGE_JSON_FILES = [
+  ["node", NODE_PACKAGE_JSON],
+  ["wasm", WASM_PACKAGE_JSON],
+];
 
 const [, , mode, ...flags] = process.argv;
 
@@ -15,35 +22,67 @@ const dryRun = flags.includes("--dry-run");
 const noTag = flags.includes("--no-tag");
 
 const cargoToml = readFileSync(ROOT_CARGO_TOML, "utf8");
-const nodePackage = JSON.parse(readFileSync(NODE_PACKAGE_JSON, "utf8"));
+const packageJsons = readPackageJsons(PACKAGE_JSON_FILES);
 const currentVersion = readWorkspaceVersion(cargoToml);
 
-if (nodePackage.version !== currentVersion) {
-  throw new Error(
-    `version mismatch: Cargo.toml=${currentVersion}, npm/fastsse_node=${nodePackage.version}`,
-  );
+for (const packageJson of packageJsons) {
+  if (packageJson.contents.version !== currentVersion) {
+    throw new Error(
+      `version mismatch: Cargo.toml=${currentVersion}, ${packageJson.path}=${packageJson.contents.version}`,
+    );
+  }
 }
 
 if (!noTag) {
   assertGitRepo();
+  assertCleanWorkingTree();
 }
 
 const nextVersion = bumpVersion(currentVersion, mode);
 const nextCargoToml = cargoToml.replace(/^version = "([^"]+)"$/m, `version = "${nextVersion}"`);
-const nextNodePackage = {
-  ...nodePackage,
-  version: nextVersion,
-};
+const nextPackages = packageJsons.map((packageJson) => ({
+  ...packageJson,
+  contents: {
+    ...packageJson.contents,
+    version: nextVersion,
+  },
+}));
 
 if (dryRun) {
-  console.log(JSON.stringify({ currentVersion, nextVersion, noTag }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        currentVersion,
+        nextVersion,
+        noTag,
+        packages: nextPackages.map(({ name, path }) => ({ name, path })),
+      },
+      null,
+      2,
+    ),
+  );
   process.exit(0);
 }
 
 writeFileSync(ROOT_CARGO_TOML, nextCargoToml);
-writeFileSync(NODE_PACKAGE_JSON, `${JSON.stringify(nextNodePackage, null, 2)}\n`);
+for (const packageJson of nextPackages) {
+  writeFileSync(packageJson.url, `${JSON.stringify(packageJson.contents, null, 2)}\n`);
+}
+refreshCargoLock();
 
 if (!noTag) {
+  const releaseFiles = [
+    ROOT_CARGO_TOML,
+    ROOT_CARGO_LOCK,
+    ...nextPackages.map(({ url }) => url),
+  ].filter((url) => existsSync(url));
+
+  execFileSync("git", ["add", ...releaseFiles.map((url) => fileURLToPath(url))], {
+    stdio: "inherit",
+  });
+  execFileSync("git", ["commit", "-m", `chore: release v${nextVersion}`], {
+    stdio: "inherit",
+  });
   execFileSync("git", ["tag", "-a", `v${nextVersion}`, "-m", `v${nextVersion}`], {
     stdio: "inherit",
   });
@@ -57,6 +96,23 @@ function readWorkspaceVersion(toml) {
     throw new Error("workspace.package.version not found in Cargo.toml");
   }
   return match[1];
+}
+
+function readPackageJsons(entries) {
+  return entries
+    .filter(([, url]) => existsSync(url))
+    .map(([name, url]) => ({
+      name,
+      url,
+      path: fileURLToPath(url),
+      contents: JSON.parse(readFileSync(url, "utf8")),
+    }));
+}
+
+function refreshCargoLock() {
+  execFileSync("cargo", ["metadata", "--format-version=1", "--no-deps"], {
+    stdio: "ignore",
+  });
 }
 
 function bumpVersion(version, release) {
@@ -106,5 +162,14 @@ function assertGitRepo() {
     throw new Error(
       "release tagging requires a git repository; use --no-tag for dry local testing",
     );
+  }
+}
+
+function assertCleanWorkingTree() {
+  const status = execFileSync("git", ["status", "--porcelain"], {
+    encoding: "utf8",
+  });
+  if (status.trim() !== "") {
+    throw new Error("release tagging requires a clean working tree");
   }
 }
