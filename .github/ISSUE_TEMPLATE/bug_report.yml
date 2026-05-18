@@ -1,0 +1,57 @@
+name: Bug report
+description: Report a reproducible defect in fastsse.
+title: "fix: "
+labels:
+  - bug
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What is broken?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Minimal input, code, command, or package setup that reproduces the issue.
+      placeholder: |
+        cargo test ...
+        node ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      placeholder: "0.1.0 / e684adf"
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Affected surface
+      options:
+        - Rust core
+        - Node binding
+        - WASM binding
+        - CI/release
+        - Documentation
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation notes
+      description: Any checks already run, logs, or known workarounds.
