@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use fastsse::{DecodeError, Decoder, OwnedEvent, OwnedItem, decode};
+use fastsse::{DecodeError, Decoder, DecoderLimits, OwnedEvent, OwnedItem, decode};
 
 fn decode_ok(input: &[u8]) -> Vec<OwnedItem> {
   decode(input).expect("decoding succeeds")
@@ -337,4 +337,50 @@ fn empty_chunks_do_not_consume_pending_crlf_lookahead() -> Result<(), DecodeErro
 fn decoding_is_invariant_for_bytewise_streaming_with_empty_chunks() {
   let input = b"\xEF\xBB\xBFid: x\r\nretry: 15\r\ndata: hello\r\ndata: world\r\n\r\n";
   assert_eq!(decode_bytewise_with_empty_chunks(input), decode_ok(input));
+}
+
+#[test]
+fn configured_line_limit_rejects_complete_oversized_line() {
+  let mut decoder = Decoder::with_limits(DecoderLimits::unbounded().max_line_bytes(6));
+  let mut items = Vec::new();
+
+  let err = decoder
+    .feed_collect(b"data: x\n\n", &mut items)
+    .expect_err("line exceeds configured limit");
+
+  assert_eq!(err.field(), "line");
+  assert_eq!(err.problem(), "configured byte limit exceeded");
+  assert!(items.is_empty());
+}
+
+#[test]
+fn configured_line_limit_rejects_partial_oversized_line() {
+  let mut decoder = Decoder::with_limits(DecoderLimits::unbounded().max_line_bytes(6));
+  let mut items = Vec::new();
+
+  decoder
+    .feed_collect(b"data:", &mut items)
+    .expect("partial line still under limit");
+  let err = decoder
+    .feed_collect(b" xy", &mut items)
+    .expect_err("partial line exceeds configured limit");
+
+  assert_eq!(err.field(), "line");
+  assert!(items.is_empty());
+}
+
+#[test]
+fn configured_event_limit_rejects_oversized_data_buffer() {
+  let mut decoder = Decoder::with_limits(DecoderLimits::unbounded().max_event_bytes(4));
+  let mut items = Vec::new();
+
+  decoder
+    .feed_collect(b"data: abc\n", &mut items)
+    .expect("data plus generated newline fits");
+  let err = decoder
+    .feed_collect(b"data:\n", &mut items)
+    .expect_err("second data line exceeds configured limit");
+
+  assert_eq!(err.field(), "data");
+  assert!(items.is_empty());
 }

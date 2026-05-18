@@ -24,6 +24,7 @@ pub struct Decoder {
   skip_next_lf: bool,
   bom_resolved: bool,
   retry: Option<u64>,
+  limits: DecoderLimits,
 }
 
 impl Default for Decoder {
@@ -40,7 +41,78 @@ impl Default for Decoder {
       skip_next_lf: false,
       bom_resolved: false,
       retry: None,
+      limits: DecoderLimits::default(),
     }
+  }
+}
+
+/// Optional limits for untrusted event streams.
+///
+/// Defaults are unbounded to preserve the base WHATWG event stream behavior.
+/// Use [`Decoder::with_limits`] for streams where an upstream peer can send
+/// arbitrarily long lines or event payloads.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct DecoderLimits {
+  max_line_bytes: Option<usize>,
+  max_event_bytes: Option<usize>,
+}
+
+impl DecoderLimits {
+  /// Creates an unbounded limit set.
+  #[must_use]
+  pub const fn unbounded() -> Self {
+    Self {
+      max_line_bytes: None,
+      max_event_bytes: None,
+    }
+  }
+
+  /// Sets the maximum decoded field line length in bytes, excluding the line terminator.
+  #[must_use]
+  pub const fn max_line_bytes(mut self, max: usize) -> Self {
+    self.max_line_bytes = Some(max);
+    self
+  }
+
+  /// Sets the maximum accumulated event `data:` buffer in bytes.
+  ///
+  /// The limit counts the protocol newline appended after each accepted `data:` line.
+  #[must_use]
+  pub const fn max_event_bytes(mut self, max: usize) -> Self {
+    self.max_event_bytes = Some(max);
+    self
+  }
+
+  /// Returns the configured maximum decoded field line length.
+  #[must_use]
+  pub const fn line_bytes(self) -> Option<usize> {
+    self.max_line_bytes
+  }
+
+  /// Returns the configured maximum accumulated event data size.
+  #[must_use]
+  pub const fn event_bytes(self) -> Option<usize> {
+    self.max_event_bytes
+  }
+
+  pub(super) fn check_line_len(self, len: usize) -> Result<(), DecodeError> {
+    check_limit("line", len, self.max_line_bytes)
+  }
+
+  pub(super) fn check_line_growth(
+    self,
+    current: usize,
+    additional: usize,
+  ) -> Result<(), DecodeError> {
+    check_limit_growth("line", current, additional, self.max_line_bytes)
+  }
+
+  pub(super) fn check_event_growth(
+    self,
+    current: usize,
+    additional: usize,
+  ) -> Result<(), DecodeError> {
+    check_limit_growth("data", current, additional, self.max_event_bytes)
   }
 }
 
@@ -49,6 +121,21 @@ impl Decoder {
   #[must_use]
   pub fn new() -> Self {
     Self::default()
+  }
+
+  /// Creates a decoder with explicit limits for untrusted streams.
+  #[must_use]
+  pub fn with_limits(limits: DecoderLimits) -> Self {
+    Self {
+      limits,
+      ..Self::default()
+    }
+  }
+
+  /// Returns the active decoder limits.
+  #[must_use]
+  pub const fn limits(&self) -> DecoderLimits {
+    self.limits
   }
 
   /// Returns the last accepted `retry:` value.
@@ -176,4 +263,31 @@ pub fn decode(input: &[u8]) -> Result<Vec<OwnedItem>, DecodeError> {
 #[inline]
 fn contains_nul(bytes: &[u8]) -> bool {
   memchr(b'\0', bytes).is_some()
+}
+
+#[inline]
+fn check_limit(field: &'static str, len: usize, max: Option<usize>) -> Result<(), DecodeError> {
+  if let Some(max) = max
+    && len > max
+  {
+    return Err(DecodeError::new(field, "configured byte limit exceeded"));
+  }
+
+  Ok(())
+}
+
+#[inline]
+fn check_limit_growth(
+  field: &'static str,
+  current: usize,
+  additional: usize,
+  max: Option<usize>,
+) -> Result<(), DecodeError> {
+  let Some(max) = max else {
+    return Ok(());
+  };
+  let Some(next) = current.checked_add(additional) else {
+    return Err(DecodeError::new(field, "configured byte limit exceeded"));
+  };
+  check_limit(field, next, Some(max))
 }

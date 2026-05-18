@@ -44,6 +44,21 @@ fn encode_comment_normalizes_all_line_endings() {
 }
 
 #[test]
+fn encode_event_normalizes_data_line_endings_to_lf() {
+  let encoded = encode_event(&EncodeEvent::message("a\r\nb\rc\n")).expect("encoding succeeds");
+
+  assert_eq!(encoded, b"data:a\ndata:b\ndata:c\ndata:\n\n");
+  assert_eq!(
+    decode(&encoded).expect("decoding succeeds"),
+    vec![OwnedItem::Event(OwnedEvent {
+      event: "message".into(),
+      data: "a\nb\nc\n".into(),
+      id: "".into(),
+    })]
+  );
+}
+
+#[test]
 fn encoded_lines_round_trip_with_preserved_leading_space() {
   let encoded = encode_event(&EncodeEvent {
     event: Some(" update"),

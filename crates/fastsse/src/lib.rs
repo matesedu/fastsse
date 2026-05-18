@@ -10,7 +10,7 @@ mod encoder;
 mod error;
 mod event;
 
-pub use crate::decoder::{Decoder, decode};
+pub use crate::decoder::{Decoder, DecoderLimits, decode};
 pub use crate::encoder::{
   encode_comment, encode_comment_to, encode_event, encode_event_to, encode_retry, encode_retry_to,
   encoded_comment_len, encoded_event_len, encoded_retry_len,
