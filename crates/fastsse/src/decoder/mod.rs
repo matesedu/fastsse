@@ -17,6 +17,8 @@ pub struct Decoder {
   data: Vec<u8>,
   event: String,
   last_event_id: String,
+  pending_last_event_id: String,
+  has_pending_last_event_id: bool,
   bom_prefix: [u8; 3],
   bom_len: u8,
   skip_next_lf: bool,
@@ -31,6 +33,8 @@ impl Default for Decoder {
       data: Vec::with_capacity(1024),
       event: String::with_capacity(32),
       last_event_id: String::with_capacity(64),
+      pending_last_event_id: String::with_capacity(64),
+      has_pending_last_event_id: false,
       bom_prefix: [0; 3],
       bom_len: 0,
       skip_next_lf: false,
@@ -67,6 +71,8 @@ impl Decoder {
     self.line.clear();
     self.data.clear();
     self.event.clear();
+    self.pending_last_event_id.clear();
+    self.has_pending_last_event_id = false;
     self.bom_len = 0;
     self.skip_next_lf = false;
     self.bom_resolved = false;
