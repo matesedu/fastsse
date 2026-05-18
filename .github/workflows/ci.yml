@@ -1,6 +1,7 @@
 name: ci
 
 on:
+  workflow_dispatch:
   pull_request:
   push:
     branches:
@@ -13,23 +14,37 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "1"
+
 jobs:
   check:
+    name: verify
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           persist-credentials: false
-      - uses: DeterminateSystems/nix-installer-action@v19
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@90bb610b90bf290cad97484ba341453bd1cbefea
+
       - name: Run checks
         run: |
           nix develop --command sh -lc '
+            set -euo pipefail
             pnpm install --frozen-lockfile
+            cargo fetch --locked
             pnpm run fmt -- --check
-            pnpm run lint
-            pnpm run check
-            pnpm run test
+            cargo clippy --locked -p fastsse -p fastsse-node --all-targets -- -D warnings
+            cargo clippy --locked -p fastsse-wasm --target wasm32-unknown-unknown -- -D warnings
+            cargo check --locked -p fastsse -p fastsse-node --all-targets
+            cargo check --locked -p fastsse-wasm --target wasm32-unknown-unknown
+            cargo test --locked -p fastsse
+            cargo test --locked -p fastsse-node
             pnpm run build:node
             pnpm run build:wasm
           '
