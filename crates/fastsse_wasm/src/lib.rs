@@ -8,6 +8,30 @@ use wasm_bindgen::prelude::*;
 
 const MAX_SAFE_INTEGER: f64 = 9_007_199_254_740_991.0;
 
+#[wasm_bindgen(typescript_custom_section)]
+const TYPESCRIPT_DEFINITIONS: &str = r#"
+export interface EncodeEventInput {
+  data: string;
+  event?: string | null;
+  id?: string | null;
+  retry?: number | null;
+}
+
+export interface DecodedEvent {
+  kind: "event";
+  event: string;
+  data: string;
+  id: string;
+}
+
+export interface DecodedRetry {
+  kind: "retry";
+  retry: number;
+}
+
+export type DecodedItem = DecodedEvent | DecodedRetry;
+"#;
+
 #[wasm_bindgen(js_name = Decoder)]
 pub struct JsDecoder {
   inner: Decoder,
@@ -30,7 +54,7 @@ impl JsDecoder {
     }
   }
 
-  #[wasm_bindgen]
+  #[wasm_bindgen(unchecked_return_type = "DecodedItem[]")]
   pub fn push(&mut self, chunk: Uint8Array) -> Result<Array, JsValue> {
     let len = chunk.length() as usize;
     self.scratch.resize(len, 0);
@@ -45,7 +69,7 @@ impl JsDecoder {
     Ok(items)
   }
 
-  #[wasm_bindgen(js_name = "pushString")]
+  #[wasm_bindgen(js_name = "pushString", unchecked_return_type = "DecodedItem[]")]
   pub fn push_string(&mut self, chunk: &str) -> Result<Array, JsValue> {
     let items = Array::new();
     self
@@ -79,7 +103,9 @@ impl JsDecoder {
 }
 
 #[wasm_bindgen(js_name = "encodeEvent")]
-pub fn encode_event_js(event: JsValue) -> Result<Uint8Array, JsValue> {
+pub fn encode_event_js(
+  #[wasm_bindgen(unchecked_param_type = "EncodeEventInput")] event: JsValue,
+) -> Result<Uint8Array, JsValue> {
   let data = get_required_string(&event, "data")?;
   let event_type = get_optional_string(&event, "event")?;
   let id = get_optional_string(&event, "id")?;

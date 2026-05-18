@@ -1,0 +1,200 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "1"
+
+jobs:
+  verify:
+    name: release / verify packages
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
+
+      - name: Install npm dependencies
+        run: |
+          nix develop .#default --command pnpm install --frozen-lockfile
+
+      - name: Fetch Rust dependencies
+        run: |
+          nix develop .#default --command cargo fetch --locked
+
+      - name: Verify release tag
+        run: |
+          nix develop .#default --command node scripts/verify-release-tag.mjs
+
+      - name: Run release gates
+        run: |
+          nix develop .#default --command bash -e -u -o pipefail -c '
+            pnpm run audit:supply-chain
+            pnpm run package:dry-run
+          '
+
+      - name: Build release artifacts
+        run: |
+          nix develop .#default --command bash -e -u -o pipefail -c '
+            mkdir -p dist/npm
+            pnpm run package:crates
+            pnpm run build:node
+            pnpm run build:wasm
+            node scripts/sync-wasm-package.mjs
+            npm pack ./npm/fastsse_node --pack-destination dist/npm
+            npm pack ./npm/fastsse_wasm --pack-destination dist/npm
+          '
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-packages
+          if-no-files-found: error
+          path: |
+            dist/npm/*.tgz
+            target/package/*.crate
+
+      - name: Attest release artifacts
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
+        with:
+          subject-path: |
+            dist/npm/*.tgz
+            target/package/*.crate
+
+  publish-crates:
+    name: release / publish crates.io
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    needs: verify
+    environment: crates-io
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
+
+      - name: Fetch Rust dependencies
+        run: |
+          nix develop .#default --command cargo fetch --locked
+
+      - name: Authenticate to crates.io
+        id: crates-io
+        uses: rust-lang/crates-io-auth-action@bbd81622f20ce9e2dd9622e3218b975523e45bbe # v1.0.4
+
+      - name: Publish crates
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.crates-io.outputs.token }}
+        run: |
+          nix develop .#default --command bash -e -u -o pipefail <<'BASH'
+          version=$(node -e "const fs=require(\"node:fs\"); const toml=fs.readFileSync(\"Cargo.toml\", \"utf8\"); console.log(toml.match(/^version = \"([^\"]+)\"$/m)[1]);")
+
+          crate_is_published() {
+            node scripts/crate-version-published.mjs "$1" "$version"
+          }
+
+          wait_for_crate() {
+            crate="$1"
+            for attempt in $(seq 1 30); do
+              if crate_is_published "$crate"; then
+                echo "$crate@$version is visible on crates.io"
+                return 0
+              fi
+              echo "waiting for $crate@$version to appear on crates.io ($attempt/30)"
+              sleep 20
+            done
+            echo "$crate@$version did not appear on crates.io in time" >&2
+            return 1
+          }
+
+          publish_crate() {
+            crate="$1"
+            if crate_is_published "$crate"; then
+              echo "$crate@$version is already published; skipping"
+            else
+              cargo publish --locked -p "$crate"
+            fi
+            wait_for_crate "$crate"
+          }
+
+          publish_crate fastsse
+          publish_crate fastsse-node
+          publish_crate fastsse-wasm
+          BASH
+
+  publish-npm:
+    name: release / publish npm
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    needs: verify
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
+
+      - name: Install npm dependencies
+        run: |
+          nix develop .#default --command pnpm install --frozen-lockfile
+
+      - name: Build npm packages
+        run: |
+          nix develop .#default --command bash -e -u -o pipefail -c '
+            pnpm run build:node
+            pnpm run build:wasm
+            node scripts/sync-wasm-package.mjs
+          '
+
+      - name: Publish npm packages
+        env:
+          NPM_CONFIG_ACCESS: public
+          NPM_CONFIG_PROVENANCE: "true"
+        run: |
+          nix develop .#default --command bash -e -u -o pipefail <<'BASH'
+          publish_package() {
+            name="$1"
+            dir="$2"
+            version=$(node -e "console.log(JSON.parse(require(\"node:fs\").readFileSync(\"$dir/package.json\", \"utf8\")).version)")
+
+            if npm view "$name@$version" version >/dev/null 2>&1; then
+              echo "$name@$version is already published; skipping"
+            else
+              npm publish "$dir" --access public --provenance
+            fi
+          }
+
+          publish_package @matesinc/fastsse-node ./npm/fastsse_node
+          publish_package @matesinc/fastsse-wasm ./npm/fastsse_wasm
+          BASH

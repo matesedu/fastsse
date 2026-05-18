@@ -26,15 +26,18 @@
     {
       devShells = forAllSystems ({ pkgs }:
         let
-          rust = pkgs.rust-bin.stable.latest.default.override {
-            extensions = ["clippy" "rustfmt"];
-            targets = ["wasm32-unknown-unknown"];
+          rustExtensions = ["clippy" "rustfmt"];
+          rustTargets = ["wasm32-unknown-unknown"];
+          mkRust = channel: channel.default.override {
+            extensions = rustExtensions;
+            targets = rustTargets;
           };
-        in
-        {
-          default = pkgs.mkShell {
+          rustLatest = mkRust pkgs.rust-bin.stable.latest;
+          rustMsrv = mkRust pkgs.rust-bin.stable."1.88.0";
+          mkShell = rust: pkgs.mkShell {
             packages = with pkgs; [
               binaryen
+              cargo-deny
               nodejs_24
               pnpm
               rust
@@ -45,6 +48,10 @@
               export PATH="$PWD/node_modules/.bin:$PATH"
             '';
           };
+        in
+        {
+          default = mkShell rustLatest;
+          msrv = mkShell rustMsrv;
         });
 
       formatter = forAllSystems ({ pkgs }: pkgs.nixpkgs-fmt);
