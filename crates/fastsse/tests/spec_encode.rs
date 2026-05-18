@@ -1,32 +1,41 @@
 #![allow(missing_docs)]
 
-use fastsse::{EncodeEvent, OwnedEvent, OwnedItem, decode, encode_comment, encode_event, encoded_event_len};
+use fastsse::{
+  EncodeEvent, OwnedEvent, OwnedItem, decode, encode_comment, encode_event, encoded_event_len,
+};
 
 #[test]
 fn encode_exact_length_and_empty_data_match_output() {
   let event = EncodeEvent::message("");
   let encoded = encode_event(&event).expect("encoding succeeds");
 
-  assert_eq!(encoded.len(), encoded_event_len(&event).expect("length succeeds"));
+  assert_eq!(
+    encoded.len(),
+    encoded_event_len(&event).expect("length succeeds")
+  );
   assert_eq!(encoded, b"data:\n\n");
 }
 
 #[test]
 fn encode_rejects_invalid_event_and_id_values() {
-  assert!(encode_event(&EncodeEvent {
-    event: Some("bad\nname"),
-    data: "ok",
-    id: None,
-    retry: None,
-  })
-  .is_err());
-  assert!(encode_event(&EncodeEvent {
-    event: None,
-    data: "ok",
-    id: Some("bad\0id"),
-    retry: None,
-  })
-  .is_err());
+  assert!(
+    encode_event(&EncodeEvent {
+      event: Some("bad\nname"),
+      data: "ok",
+      id: None,
+      retry: None,
+    })
+    .is_err()
+  );
+  assert!(
+    encode_event(&EncodeEvent {
+      event: None,
+      data: "ok",
+      id: Some("bad\0id"),
+      retry: None,
+    })
+    .is_err()
+  );
 }
 
 #[test]

@@ -35,12 +35,16 @@ fn decode_bytewise_with_empty_chunks(input: &[u8]) -> Vec<OwnedItem> {
   let mut decoder = Decoder::new();
   let mut out = Vec::new();
   for byte in input {
-    decoder.feed_collect(b"", &mut out).expect("empty chunk decodes");
+    decoder
+      .feed_collect(b"", &mut out)
+      .expect("empty chunk decodes");
     decoder
       .feed_collect(core::slice::from_ref(byte), &mut out)
       .expect("byte chunk decodes");
   }
-  decoder.feed_collect(b"", &mut out).expect("empty chunk decodes");
+  decoder
+    .feed_collect(b"", &mut out)
+    .expect("empty chunk decodes");
   decoder.finish();
   out
 }
@@ -291,7 +295,11 @@ fn decoding_is_invariant_for_all_single_split_points() {
   let expected = decode_ok(input);
 
   for split in 0..=input.len() {
-    assert_eq!(decode_with_split(input, split), expected, "split at {split}");
+    assert_eq!(
+      decode_with_split(input, split),
+      expected,
+      "split at {split}"
+    );
   }
 }
 

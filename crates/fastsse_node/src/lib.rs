@@ -1,6 +1,8 @@
 #![allow(missing_docs)]
 
-use fastsse::{DecodeError, Decoder, EncodeError, EncodeEvent, Item, encode_comment, encode_event, encode_retry};
+use fastsse::{
+  DecodeError, Decoder, EncodeError, EncodeEvent, Item, encode_comment, encode_event, encode_retry,
+};
 use napi::bindgen_prelude::{Buffer, Result};
 use napi::{Error, Status};
 use napi_derive::napi;
@@ -88,9 +90,7 @@ impl JsDecoder {
 #[napi(js_name = "encodeEvent")]
 pub fn encode_event_js(event: JsEncodeEvent) -> Result<Buffer> {
   let event = js_encode_event_to_rust(&event)?;
-  encode_event(&event)
-    .map(Buffer::from)
-    .map_err(encode_error)
+  encode_event(&event).map(Buffer::from).map_err(encode_error)
 }
 
 #[napi(js_name = "encodeRetry")]

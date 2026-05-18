@@ -94,11 +94,7 @@ impl Decoder {
   }
 
   /// Feeds a byte chunk into the decoder.
-  pub fn feed<'chunk, F>(
-    &mut self,
-    mut chunk: &'chunk [u8],
-    mut emit: F,
-  ) -> Result<(), DecodeError>
+  pub fn feed<'chunk, F>(&mut self, mut chunk: &'chunk [u8], mut emit: F) -> Result<(), DecodeError>
   where
     F: for<'event> FnMut(Item<'event>),
   {

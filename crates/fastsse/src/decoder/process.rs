@@ -7,7 +7,11 @@ use crate::error::DecodeError;
 use crate::event::{Event, Item};
 
 impl Decoder {
-  pub(super) fn process_input<F>(&mut self, mut chunk: &[u8], emit: &mut F) -> Result<(), DecodeError>
+  pub(super) fn process_input<F>(
+    &mut self,
+    mut chunk: &[u8],
+    emit: &mut F,
+  ) -> Result<(), DecodeError>
   where
     F: for<'event> FnMut(Item<'event>),
   {
@@ -82,7 +86,11 @@ struct ProcessState<'a> {
   retry: &'a mut Option<u64>,
 }
 
-fn process_line<F>(line: &[u8], state: &mut ProcessState<'_>, emit: &mut F) -> Result<(), DecodeError>
+fn process_line<F>(
+  line: &[u8],
+  state: &mut ProcessState<'_>,
+  emit: &mut F,
+) -> Result<(), DecodeError>
 where
   F: for<'event> FnMut(Item<'event>),
 {
@@ -108,12 +116,16 @@ where
   if field == b"id" {
     if !contains_nul(value) {
       state.pending_last_event_id.clear();
-      state.pending_last_event_id.push_str(decode_utf8(value).as_ref());
+      state
+        .pending_last_event_id
+        .push_str(decode_utf8(value).as_ref());
       *state.has_pending_last_event_id = true;
     }
     return Ok(());
   }
-  if field == b"retry" && let Some(parsed) = parse_retry(value) {
+  if field == b"retry"
+    && let Some(parsed) = parse_retry(value)
+  {
     *state.retry = Some(parsed);
     emit(Item::Retry(parsed));
   }
@@ -121,10 +133,7 @@ where
   Ok(())
 }
 
-fn dispatch_event<F>(
-  state: &mut ProcessState<'_>,
-  emit: &mut F,
-) -> Result<(), DecodeError>
+fn dispatch_event<F>(state: &mut ProcessState<'_>, emit: &mut F) -> Result<(), DecodeError>
 where
   F: for<'event> FnMut(Item<'event>),
 {
