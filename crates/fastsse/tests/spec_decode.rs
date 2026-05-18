@@ -225,7 +225,11 @@ fn decoding_is_invariant_for_all_single_split_points() {
   let expected = decode_ok(input);
 
   for split in 0..=input.len() {
-    assert_eq!(decode_with_split(input, split), expected, "split at {split}");
+    assert_eq!(
+      decode_with_split(input, split),
+      expected,
+      "split at {split}"
+    );
   }
 }
 

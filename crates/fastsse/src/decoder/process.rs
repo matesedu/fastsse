@@ -7,7 +7,11 @@ use crate::error::DecodeError;
 use crate::event::{Event, Item};
 
 impl Decoder {
-  pub(super) fn process_input<F>(&mut self, mut chunk: &[u8], emit: &mut F) -> Result<(), DecodeError>
+  pub(super) fn process_input<F>(
+    &mut self,
+    mut chunk: &[u8],
+    emit: &mut F,
+  ) -> Result<(), DecodeError>
   where
     F: for<'event> FnMut(Item<'event>),
   {
@@ -102,7 +106,9 @@ where
     }
     return Ok(());
   }
-  if field == b"retry" && let Some(parsed) = parse_retry(value) {
+  if field == b"retry"
+    && let Some(parsed) = parse_retry(value)
+  {
     *retry = Some(parsed);
     emit(Item::Retry(parsed));
   }

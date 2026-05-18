@@ -1,17 +1,8 @@
 #![allow(missing_docs)]
 
 use fastsse::{
-  DecodeError,
-  Decoder,
-  EncodeEvent,
-  Event,
-  Item,
-  OwnedEvent,
-  OwnedItem,
-  decode,
-  encode_comment,
-  encode_event,
-  encode_retry,
+  DecodeError, Decoder, EncodeEvent, Event, Item, OwnedEvent, OwnedItem, decode, encode_comment,
+  encode_event, encode_retry,
 };
 use insta::assert_snapshot;
 
@@ -33,7 +24,10 @@ fn encodes_control_blocks_snapshot() {
   let mut combined = encode_comment("keepalive");
   combined.extend_from_slice(&encode_retry(2_000));
 
-  assert_snapshot!("encode_controls", String::from_utf8(combined).expect("utf8"));
+  assert_snapshot!(
+    "encode_controls",
+    String::from_utf8(combined).expect("utf8")
+  );
 }
 
 #[test]
@@ -42,10 +36,7 @@ fn decodes_chunked_stream_and_preserves_last_event_id() -> Result<(), DecodeErro
   let mut items = Vec::new();
 
   decoder.feed_collect(b"\xEF\xBB", &mut items)?;
-  decoder.feed_collect(
-    b"\xBFid: one\r\nevent: update\r\ndata: hel",
-    &mut items,
-  )?;
+  decoder.feed_collect(b"\xBFid: one\r\nevent: update\r\ndata: hel", &mut items)?;
   decoder.feed_collect(b"lo\r\ndata: world\r\n\r\n", &mut items)?;
   decoder.feed_collect(b"data: next\n\n", &mut items)?;
 
@@ -73,7 +64,9 @@ fn decodes_retry_before_event() -> Result<(), DecodeError> {
   let mut decoder = Decoder::new();
   let mut items = Vec::new();
 
-  decoder.feed(b"retry: 2500\ndata: ok\n\n", |item| items.push(item.to_owned()))?;
+  decoder.feed(b"retry: 2500\ndata: ok\n\n", |item| {
+    items.push(item.to_owned())
+  })?;
 
   assert_eq!(
     items,
@@ -96,7 +89,9 @@ fn ignores_retry_with_non_digits() -> Result<(), DecodeError> {
   let mut decoder = Decoder::new();
   let mut items = Vec::new();
 
-  decoder.feed(b"retry: 10ms\ndata: ok\n\n", |item| items.push(item.to_owned()))?;
+  decoder.feed(b"retry: 10ms\ndata: ok\n\n", |item| {
+    items.push(item.to_owned())
+  })?;
 
   assert_eq!(
     items,

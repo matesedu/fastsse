@@ -1,6 +1,8 @@
 #![allow(missing_docs)]
 
-use fastsse::{DecodeError, Decoder, EncodeError, EncodeEvent, Item, encode_comment, encode_event, encode_retry};
+use fastsse::{
+  DecodeError, Decoder, EncodeError, EncodeEvent, Item, encode_comment, encode_event, encode_retry,
+};
 use js_sys::{Array, Object, Reflect, Uint8Array};
 use wasm_bindgen::prelude::*;
 

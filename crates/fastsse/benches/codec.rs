@@ -25,22 +25,28 @@ fn bench_decode(criterion: &mut Criterion) {
     b"id: evt-42\nevent: update\nretry: 5000\ndata: alpha\ndata: beta\ndata: gamma\ndata: delta\n\n";
 
   group.throughput(Throughput::Bytes(payload.len() as u64));
-  group.bench_with_input(BenchmarkId::from_parameter("single-chunk"), &payload, |bencher, input| {
-    bencher.iter(|| {
-      let mut decoder = Decoder::new();
-      decoder
-        .feed(input, |_| {})
-        .expect("decoding succeeds");
-    });
-  });
-  group.bench_with_input(BenchmarkId::from_parameter("16-byte-chunks"), &payload, |bencher, input| {
-    bencher.iter(|| {
-      let mut decoder = Decoder::new();
-      for chunk in input.chunks(16) {
-        decoder.feed(chunk, |_| {}).expect("decoding succeeds");
-      }
-    });
-  });
+  group.bench_with_input(
+    BenchmarkId::from_parameter("single-chunk"),
+    &payload,
+    |bencher, input| {
+      bencher.iter(|| {
+        let mut decoder = Decoder::new();
+        decoder.feed(input, |_| {}).expect("decoding succeeds");
+      });
+    },
+  );
+  group.bench_with_input(
+    BenchmarkId::from_parameter("16-byte-chunks"),
+    &payload,
+    |bencher, input| {
+      bencher.iter(|| {
+        let mut decoder = Decoder::new();
+        for chunk in input.chunks(16) {
+          decoder.feed(chunk, |_| {}).expect("decoding succeeds");
+        }
+      });
+    },
+  );
   group.finish();
 }
 
