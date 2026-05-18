@@ -31,11 +31,13 @@ jobs:
           - name: format
             node: true
             cargo: false
+            nix_shell: .#default
             command: pnpm run fmt -- --check
 
           - name: rust lint
             node: false
             cargo: true
+            nix_shell: .#default
             command: |
               cargo clippy --locked -p fastsse -p fastsse-node --all-targets -- -D warnings
               cargo clippy --locked -p fastsse-wasm --target wasm32-unknown-unknown -- -D warnings
@@ -43,25 +45,50 @@ jobs:
           - name: rust check
             node: false
             cargo: true
+            nix_shell: .#default
             command: |
+              cargo check --locked -p fastsse -p fastsse-node --all-targets
+              cargo check --locked -p fastsse-wasm --target wasm32-unknown-unknown
+
+          - name: rust msrv
+            node: false
+            cargo: true
+            nix_shell: .#msrv
+            command: |
+              echo "Checking MSRV from workspace.package.rust-version; update Cargo.toml and flake.nix together if this fails."
               cargo check --locked -p fastsse -p fastsse-node --all-targets
               cargo check --locked -p fastsse-wasm --target wasm32-unknown-unknown
 
           - name: rust test
             node: false
             cargo: true
+            nix_shell: .#default
             command: |
               cargo test --locked -p fastsse
               cargo test --locked -p fastsse-node
 
+          - name: supply-chain audit
+            node: true
+            cargo: true
+            nix_shell: .#default
+            command: pnpm run audit:supply-chain
+
+          - name: package dry-run
+            node: true
+            cargo: true
+            nix_shell: .#default
+            command: pnpm run package:dry-run
+
           - name: node package
             node: true
             cargo: true
+            nix_shell: .#default
             command: pnpm run build:node
 
           - name: wasm package
             node: true
             cargo: true
+            nix_shell: .#default
             command: pnpm run build:wasm
     steps:
       - name: Checkout
@@ -85,5 +112,6 @@ jobs:
       - name: Run ${{ matrix.name }}
         env:
           CHECK_COMMAND: ${{ matrix.command }}
+          NIX_SHELL: ${{ matrix.nix_shell }}
         run: |
-          nix develop --command bash -e -u -o pipefail -c "$CHECK_COMMAND"
+          nix develop "$NIX_SHELL" --command bash -e -u -o pipefail -c "$CHECK_COMMAND"

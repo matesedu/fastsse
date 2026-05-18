@@ -39,7 +39,10 @@ if (!noTag) {
 }
 
 const nextVersion = bumpVersion(currentVersion, mode);
-const nextCargoToml = cargoToml.replace(/^version = "([^"]+)"$/m, `version = "${nextVersion}"`);
+const nextCargoToml = setWorkspaceFastsseDependencyVersion(
+  setWorkspaceVersion(cargoToml, nextVersion),
+  nextVersion,
+);
 const nextPackages = packageJsons.map((packageJson) => ({
   ...packageJson,
   contents: {
@@ -55,6 +58,7 @@ if (dryRun) {
         currentVersion,
         nextVersion,
         noTag,
+        workspaceDependency: `fastsse = "=${nextVersion}"`,
         packages: nextPackages.map(({ name, path }) => ({ name, path })),
       },
       null,
@@ -75,7 +79,7 @@ if (!noTag) {
     ROOT_CARGO_TOML,
     ROOT_CARGO_LOCK,
     ...nextPackages.map(({ url }) => url),
-  ].filter((url) => existsSync(url));
+  ].filter((url) => existsSync(url) && shouldStageReleaseFile(url));
 
   execFileSync("git", ["add", ...releaseFiles.map((url) => fileURLToPath(url))], {
     stdio: "inherit",
@@ -109,10 +113,48 @@ function readPackageJsons(entries) {
     }));
 }
 
+function setWorkspaceVersion(toml, version) {
+  const nextToml = toml.replace(/^version = "([^"]+)"$/m, `version = "${version}"`);
+  if (nextToml === toml) {
+    throw new Error("workspace.package.version not found in Cargo.toml");
+  }
+  return nextToml;
+}
+
+function setWorkspaceFastsseDependencyVersion(toml, version) {
+  const nextToml = toml.replace(
+    /^fastsse = \{ path = "crates\/fastsse", version = "=[^"]+" \}$/m,
+    `fastsse = { path = "crates/fastsse", version = "=${version}" }`,
+  );
+  if (nextToml === toml) {
+    throw new Error("workspace.dependencies.fastsse exact version not found in Cargo.toml");
+  }
+  return nextToml;
+}
+
 function refreshCargoLock() {
   execFileSync("cargo", ["metadata", "--format-version=1", "--no-deps"], {
     stdio: "ignore",
   });
+}
+
+function shouldStageReleaseFile(url) {
+  const path = fileURLToPath(url);
+  try {
+    execFileSync("git", ["ls-files", "--error-unmatch", path], {
+      stdio: "ignore",
+    });
+    return true;
+  } catch {
+    try {
+      execFileSync("git", ["check-ignore", "-q", path], {
+        stdio: "ignore",
+      });
+      return false;
+    } catch {
+      return true;
+    }
+  }
 }
 
 function bumpVersion(version, release) {

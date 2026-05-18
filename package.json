@@ -8,6 +8,10 @@
     "sse",
     "wasm"
   ],
+  "homepage": "https://github.com/matesedu/fastsse#readme",
+  "bugs": {
+    "url": "https://github.com/matesedu/fastsse/issues"
+  },
   "license": "GPL-3.0-or-later",
   "author": "Mates Inc.",
   "repository": {
@@ -18,6 +22,10 @@
     "build": "cargo build --workspace",
     "build:node": "pnpm --dir npm/fastsse_node run build",
     "build:wasm": "wasm-pack build crates/fastsse_wasm --target web --out-dir ../../npm/fastsse_wasm --out-name fastsse",
+    "audit:supply-chain": "cargo deny check && pnpm audit --audit-level moderate && node scripts/audit-npm-licenses.mjs",
+    "package:crates": "node scripts/package-crates.mjs",
+    "package:npm": "pnpm run build:node && npm pack --dry-run --json ./npm/fastsse_node && pnpm run build:wasm && node scripts/sync-wasm-package.mjs && npm pack --dry-run --json ./npm/fastsse_wasm",
+    "package:dry-run": "pnpm run package:crates && pnpm run package:npm",
     "fmt": "oxfmt .",
     "check": "cargo check -p fastsse -p fastsse-node --all-targets && cargo check -p fastsse-wasm --target wasm32-unknown-unknown",
     "lint": "cargo clippy -p fastsse -p fastsse-node --all-targets -- -D warnings && cargo clippy -p fastsse-wasm --target wasm32-unknown-unknown -- -D warnings",
