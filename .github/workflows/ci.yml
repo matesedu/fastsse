@@ -19,10 +19,50 @@ env:
   RUST_BACKTRACE: "1"
 
 jobs:
-  check:
-    name: verify
+  checks:
+    name: check / ${{ matrix.name }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        include:
+          - name: format
+            node: true
+            cargo: false
+            command: pnpm run fmt -- --check
+
+          - name: rust lint
+            node: false
+            cargo: true
+            command: |
+              cargo clippy --locked -p fastsse -p fastsse-node --all-targets -- -D warnings
+              cargo clippy --locked -p fastsse-wasm --target wasm32-unknown-unknown -- -D warnings
+
+          - name: rust check
+            node: false
+            cargo: true
+            command: |
+              cargo check --locked -p fastsse -p fastsse-node --all-targets
+              cargo check --locked -p fastsse-wasm --target wasm32-unknown-unknown
+
+          - name: rust test
+            node: false
+            cargo: true
+            command: |
+              cargo test --locked -p fastsse
+              cargo test --locked -p fastsse-node
+
+          - name: node package
+            node: true
+            cargo: true
+            command: pnpm run build:node
+
+          - name: wasm package
+            node: true
+            cargo: true
+            command: pnpm run build:wasm
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
@@ -32,19 +72,18 @@ jobs:
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25
 
-      - name: Run checks
+      - name: Install npm dependencies
+        if: ${{ matrix.node }}
         run: |
-          nix develop --command sh -lc '
-            set -euo pipefail
-            pnpm install --frozen-lockfile
-            cargo fetch --locked
-            pnpm run fmt -- --check
-            cargo clippy --locked -p fastsse -p fastsse-node --all-targets -- -D warnings
-            cargo clippy --locked -p fastsse-wasm --target wasm32-unknown-unknown -- -D warnings
-            cargo check --locked -p fastsse -p fastsse-node --all-targets
-            cargo check --locked -p fastsse-wasm --target wasm32-unknown-unknown
-            cargo test --locked -p fastsse
-            cargo test --locked -p fastsse-node
-            pnpm run build:node
-            pnpm run build:wasm
-          '
+          nix develop --command pnpm install --frozen-lockfile
+
+      - name: Fetch Rust dependencies
+        if: ${{ matrix.cargo }}
+        run: |
+          nix develop --command cargo fetch --locked
+
+      - name: Run ${{ matrix.name }}
+        env:
+          CHECK_COMMAND: ${{ matrix.command }}
+        run: |
+          nix develop --command bash -e -u -o pipefail -c "$CHECK_COMMAND"
