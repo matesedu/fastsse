@@ -83,13 +83,13 @@ jobs:
             node: true
             cargo: true
             nix_shell: .#default
-            command: pnpm run build:node
+            command: pnpm run package:node
 
           - name: wasm package
             node: true
             cargo: true
             nix_shell: .#default
-            command: pnpm run build:wasm
+            command: pnpm run package:wasm
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
@@ -106,8 +106,10 @@ jobs:
 
       - name: Fetch Rust dependencies
         if: ${{ matrix.cargo }}
+        env:
+          NIX_SHELL: ${{ matrix.nix_shell }}
         run: |
-          nix develop --command cargo fetch --locked
+          nix develop "$NIX_SHELL" --command cargo fetch --locked
 
       - name: Run ${{ matrix.name }}
         env:

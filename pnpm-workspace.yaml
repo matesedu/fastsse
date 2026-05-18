@@ -1,2 +1,3 @@
 packages:
   - npm/*
+  - "!npm/fastsse_wasm"
