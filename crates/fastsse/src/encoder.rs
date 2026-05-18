@@ -29,6 +29,9 @@ pub fn encoded_comment_len(comment: &str) -> usize {
 }
 
 /// Returns the exact encoded byte length for an event block.
+///
+/// Event payload line endings are normalized: `\r\n`, bare `\r`, and bare `\n`
+/// all become separate `data:` lines, which decode back with LF separators.
 pub fn encoded_event_len(event: &EncodeEvent<'_>) -> Result<usize, EncodeError> {
   validate_field("event", event.event)?;
   validate_id(event.id)?;
@@ -84,6 +87,9 @@ pub fn encode_comment_to(comment: &str, out: &mut Vec<u8>) {
 }
 
 /// Encodes an SSE event block into a fresh byte vector.
+///
+/// Event payload line endings are normalized: `\r\n`, bare `\r`, and bare `\n`
+/// all become separate `data:` lines, which decode back with LF separators.
 pub fn encode_event(event: &EncodeEvent<'_>) -> Result<Vec<u8>, EncodeError> {
   let len = encoded_event_len(event)?;
   let mut out = Vec::with_capacity(len);
@@ -92,6 +98,9 @@ pub fn encode_event(event: &EncodeEvent<'_>) -> Result<Vec<u8>, EncodeError> {
 }
 
 /// Appends an SSE event block to `out`.
+///
+/// Event payload line endings are normalized: `\r\n`, bare `\r`, and bare `\n`
+/// all become separate `data:` lines, which decode back with LF separators.
 pub fn encode_event_to(event: &EncodeEvent<'_>, out: &mut Vec<u8>) -> Result<(), EncodeError> {
   out.reserve(encoded_event_len(event)?);
   write_event(event, out);
