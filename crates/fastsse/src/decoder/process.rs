@@ -12,6 +12,9 @@ impl Decoder {
     F: for<'event> FnMut(Item<'event>),
   {
     if self.skip_next_lf {
+      if chunk.is_empty() {
+        return Ok(());
+      }
       self.skip_next_lf = false;
       if chunk.first() == Some(&b'\n') {
         chunk = &chunk[1..];
