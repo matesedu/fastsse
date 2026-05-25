@@ -39,7 +39,7 @@
     "release:beta": "node scripts/release.mjs beta"
   },
   "devDependencies": {
-    "@napi-rs/cli": "3.5.1",
+    "@napi-rs/cli": "3.6.2",
     "oxfmt": "^0.36.0",
     "vite-plus": "0.1.21"
   },
